@@ -6,56 +6,103 @@
 <title>Discount Calculator</title>
 
 <style>
-body {
+/* ====== Reset & Base ====== */
+* {
+  box-sizing: border-box;
   margin: 0;
+  padding: 0;
+}
+body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #0f172a;
   color: #f9fafb;
+  line-height: 1.4;
+  padding: 16px;
 }
 .app {
   max-width: 520px;
   margin: auto;
-  padding: 16px;
 }
+
+/* ====== Headings ====== */
 h1 {
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  font-size: 1.8rem;
+  color: #f9fafb;
 }
+
+/* ====== Labels & Inputs ====== */
 label {
+  display: block;
   font-size: 0.85rem;
   color: #9ca3af;
+  margin-bottom: 4px;
 }
-input, select, button {
+input, select {
   width: 100%;
-  padding: 14px;
-  margin-top: 6px;
-  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
   border: none;
   font-size: 1rem;
+  background: #1f2937;
+  color: #f9fafb;
 }
+input:focus, select:focus {
+  outline: 2px solid #22c55e;
+}
+
+/* ====== Buttons ====== */
 button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: none;
+  font-size: 1rem;
+  font-weight: bold;
   background: #22c55e;
   color: #020617;
-  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
 }
+button:hover {
+  background: #16a34a;
+}
+
+/* ====== Dividers ====== */
 hr {
   border: none;
   border-top: 1px solid #1f2937;
-  margin: 14px 0;
+  margin: 16px 0;
 }
+
+/* ====== Items ====== */
 .item {
-  background: #020617;
+  background: #1f2937;
   padding: 12px;
   border-radius: 12px;
-  margin-top: 10px;
+  margin-bottom: 12px;
 }
+
+/* ====== Grid Layout for Price & Qty ====== */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ====== Totals ====== */
 .row {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 1rem;
 }
 .total {
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: bold;
   color: #22c55e;
 }
@@ -66,8 +113,11 @@ hr {
 <div class="app">
 <h1>Discount Calculator</h1>
 
-<label>ZIP Code (auto tax)</label>
-<input id="zip" inputmode="numeric" placeholder="90210">
+<label>State Tax Preset</label>
+<select id="stateTax"></select>
+
+<label>Sales Tax (%)</label>
+<input id="taxRate" type="number" step="0.01" min="0">
 
 <label>Payment Type</label>
 <select id="payment">
@@ -89,54 +139,49 @@ hr {
 
 <script>
 /* ======================
-   STATE
+   STATE TAX PRESETS
 ====================== */
-let items = [];
-let taxRate = 0;
+const stateTaxes = {
+  "Alabama":4, "Alaska":0, "Arizona":5.6, "Arkansas":6.5,
+  "California":7.25, "Colorado":2.9, "Connecticut":6.35,
+  "Delaware":0, "Florida":6, "Georgia":4,
+  "Hawaii":4, "Idaho":6, "Illinois":6.25,
+  "Indiana":7, "Iowa":6, "Kansas":6.5,
+  "Kentucky":6, "Louisiana":4.45, "Maine":5.5,
+  "Maryland":6, "Massachusetts":6.25, "Michigan":6,
+  "Minnesota":6.875, "Mississippi":7, "Missouri":4.225,
+  "Montana":0, "Nebraska":5.5, "Nevada":6.85,
+  "New Hampshire":0, "New Jersey":6.625, "New Mexico":5.125,
+  "New York":4, "North Carolina":4.75, "North Dakota":5,
+  "Ohio":5.75, "Oklahoma":4.5, "Oregon":0,
+  "Pennsylvania":6, "Rhode Island":7, "South Carolina":6,
+  "South Dakota":4.2, "Tennessee":7, "Texas":6.25,
+  "Utah":4.85, "Vermont":6, "Virginia":5.3,
+  "Washington":6.5, "West Virginia":6,
+  "Wisconsin":5, "Wyoming":4,
+  "District of Columbia":6
+};
 
-/* ======================
-   ZIP → TAX (cached)
-====================== */
-async function fetchTax(zip) {
-  if (!zip) return;
+const stateSelect = document.getElementById("stateTax");
+Object.entries(stateTaxes).forEach(([state, rate]) => {
+  const opt = document.createElement("option");
+  opt.value = rate;
+  opt.textContent = `${state} (${rate}%)`;
+  stateSelect.appendChild(opt);
+});
 
-  const cacheKey = "tax_" + zip;
-  if (localStorage[cacheKey]) {
-    taxRate = parseFloat(localStorage[cacheKey]);
-    calc();
-    return;
-  }
-
-  try {
-    const res = await fetch("https://api.zippopotam.us/us/" + zip);
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    const state = data.places[0]["state abbreviation"];
-
-    const stateRates = {
-      AL:0.04, AZ:0.056, CA:0.0725, CO:0.029, FL:0.06,
-      GA:0.04, IL:0.0625, NY:0.04, PA:0.06, TX:0.0625,
-      WA:0.065
-    };
-
-    taxRate = stateRates[state] ?? 0.05;
-    localStorage[cacheKey] = taxRate;
-    calc();
-  } catch {
-    taxRate = 0;
-    calc();
-  }
-}
-
-document.getElementById("zip").addEventListener("change", e => {
-  fetchTax(e.target.value);
+stateSelect.addEventListener("change", () => {
+  document.getElementById("taxRate").value = stateSelect.value;
+  calc();
 });
 
 /* ======================
    ITEMS
 ====================== */
+let items = [];
+
 function addItem() {
-  items.push({ price: 0, discount: 0 });
+  items.push({ price: 0, qty: 1, discount: 0 });
   renderItems();
 }
 
@@ -147,10 +192,20 @@ function renderItems() {
   items.forEach((item, index) => {
     container.innerHTML += `
       <div class="item">
-        <label>Item Price</label>
-        <input type="number" step="0.01" min="0"
-          value="${item.price}"
-          oninput="items[${index}].price=this.value;calc()">
+        <div class="grid">
+          <div>
+            <label>Price</label>
+            <input type="number" step="0.01" min="0"
+              value="${item.price}"
+              oninput="items[${index}].price=this.value;calc()">
+          </div>
+          <div>
+            <label>Qty</label>
+            <input type="number" min="1"
+              value="${item.qty}"
+              oninput="items[${index}].qty=this.value;calc()">
+          </div>
+        </div>
 
         <label>Discount (%)</label>
         <input type="number" step="0.01" min="0" max="95"
@@ -179,10 +234,11 @@ function calc() {
   let subtotal = 0;
 
   items.forEach(item => {
-    subtotal += item.price * (1 - item.discount / 100);
+    subtotal += item.price * item.qty * (1 - item.discount / 100);
   });
 
-  let tax = subtotal * taxRate;
+  const taxPercent = parseFloat(document.getElementById("taxRate").value) || 0;
+  let tax = subtotal * (taxPercent / 100);
   let total = subtotal + tax;
 
   if (document.getElementById("payment").value === "cash") {
@@ -195,8 +251,16 @@ function calc() {
 }
 
 /* ======================
+   EVENTS
+====================== */
+document.getElementById("taxRate").addEventListener("input", calc);
+document.getElementById("payment").addEventListener("change", calc);
+
+/* ======================
    INIT
 ====================== */
+stateSelect.selectedIndex = 0;
+document.getElementById("taxRate").value = stateSelect.value;
 addItem();
 </script>
 </body>
